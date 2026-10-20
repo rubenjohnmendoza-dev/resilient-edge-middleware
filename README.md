@@ -9,6 +9,8 @@ structured request tracing.
 The stack contains:
 
 - `rem`: Wrangler dev server on port `8787`
+- `pocketbase`: persistent PocketBase backend and admin UI on port `8090`
+- `stirling-pdf`: local Stirling-PDF document utility on port `8080`
 - `mock-webhook`: Node webhook receiver and API probe on port `8788`
 - `chaos`: an on-demand chaos runner using `tests/chaos/chaos-injector.ts`
 
@@ -18,21 +20,53 @@ From the repository root:
 
 ```bash
 cd docker
-docker compose up
+docker compose up -d
 ```
 
-The first run builds the image and starts the REM service and mock webhook.
-Use `docker compose up --build` after changing dependencies, the Dockerfile, or
-the container command.
+The first run builds the REM image and starts REM, PocketBase, Stirling-PDF, and
+the mock webhook. Use `docker compose up -d --build` after changing
+dependencies, the Dockerfile, or the container command.
 
-Wait for both health checks to pass, then verify:
+Check service state and wait for the REM health check:
 
 ```bash
+docker compose ps
 curl http://localhost:8787/health
-curl http://localhost:8788/health
 ```
 
-Expected responses include `{"status":"ok"}`.
+Primary access ports:
+
+| Service | URL |
+| --- | --- |
+| REM Worker | `http://localhost:8787` |
+| PocketBase Admin | `http://localhost:8090/_/` |
+| Stirling-PDF UI | `http://localhost:8080` |
+| Mock webhook | `http://localhost:8788` |
+
+### PocketBase persistence
+
+On the first run, open PocketBase Admin and create a superuser. The Compose
+defaults are:
+
+```text
+Email:    admin@rem.local
+Password: rem-local-dev-password
+```
+
+Change these before starting the stack by setting
+`POCKETBASE_ADMIN_EMAIL` and `POCKETBASE_ADMIN_PASSWORD`, then create the same
+superuser in PocketBase. These defaults are for local development only.
+
+The adapter authenticates lazily and creates these collections on first use:
+
+- `idempotency_keys`
+- `request_audit_logs`
+- `telemetry_metrics`
+
+Idempotency hashes, span metrics, and request audit records are then stored in
+the `pocketbase_data` volume and survive Worker restarts. If PocketBase is
+unavailable or not yet configured, idempotency falls back to the isolate-local
+memory store and telemetry continues to stdout.
 
 ### Submit an order
 
@@ -49,7 +83,8 @@ curl -X POST http://localhost:8787/orders \
 ```
 
 The first request returns `200`. Sending the exact same body again within the
-24-hour idempotency window returns `409` with `DUPLICATE_REQUEST`.
+24-hour idempotency window returns `409` with `DUPLICATE_REQUEST`. When
+PocketBase is configured, that reservation is persisted in PocketBase.
 
 ### Exercise the mock webhook
 
@@ -101,8 +136,8 @@ bursts, and seed `20261020`.
 
 The Compose service starts Wrangler with `CHAOS_MODE=true`. This enables:
 
-- `POST /_chaos/reset`: clears the in-memory idempotency store and closes the
-  circuit breaker.
+- `POST /_chaos/reset`: clears persisted or in-memory idempotency state and
+  closes the circuit breaker.
 - `x-chaos-fail: 1` on `POST /orders`: returns `503 CHAOS_FAILURE` and records a
   breaker failure.
 
@@ -155,7 +190,7 @@ PowerShell:
 ```powershell
 .venv\Scripts\Activate.ps1
 pip install -r service/requirements.txt
-uvicorn service.scrub_media:app --host 127.0.0.1 --port 8090
+uvicorn service.scrub_media:app --host 127.0.0.1 --port 8091
 ```
 
 macOS/Linux:
@@ -163,21 +198,21 @@ macOS/Linux:
 ```bash
 source .venv/bin/activate
 pip install -r service/requirements.txt
-uvicorn service.scrub_media:app --host 127.0.0.1 --port 8090
+uvicorn service.scrub_media:app --host 127.0.0.1 --port 8091
 ```
 
 Upload a file for scrubbing:
 
 ```bash
 curl -F "file=@input.jpg" \
-  http://127.0.0.1:8090/scrub/upload \
+  http://127.0.0.1:8091/scrub/upload \
   -o scrubbed.jpg
 ```
 
 Scrub a path available to the local service:
 
 ```bash
-curl -X POST http://127.0.0.1:8090/scrub \
+curl -X POST http://127.0.0.1:8091/scrub \
   -H "content-type: application/json" \
   -d '{"path":"input.png"}'
 ```
@@ -221,7 +256,8 @@ cd docker
 docker compose down -v
 ```
 
-The idempotency store, circuit-breaker state, and trace store are in-memory and
-isolate-local. A production deployment should use a Durable Object or SQLite
-for shared idempotency and circuit state, and forward telemetry to a durable
-collector.
+With PocketBase running, idempotency reservations and telemetry writes are
+persistent. The circuit breaker remains isolate-local, and PocketBase write
+failures fall back to the in-memory idempotency store for local availability.
+Use `docker compose down` to stop services while retaining `pocketbase_data`, or
+`docker compose down -v` to remove the volume and all stored records.

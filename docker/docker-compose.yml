@@ -6,6 +6,26 @@ x-rem-build: &rem-build
     dockerfile: docker/Dockerfile
 
 services:
+  pocketbase:
+    image: ghcr.io/pocketbase/pocketbase:latest
+    command:
+      - serve
+      - --http=0.0.0.0:8090
+      - --dir=/pb_data
+    ports:
+      - "8090:8090"
+    volumes:
+      - pocketbase_data:/pb_data
+    restart: unless-stopped
+
+  stirling-pdf:
+    image: frooodle/s-pdf:latest
+    ports:
+      - "8080:8080"
+    environment:
+      DOCKER_ENABLE_SECURITY: "false"
+    restart: unless-stopped
+
   rem:
     <<: *rem-build
     command:
@@ -21,10 +41,34 @@ services:
       - --show-interactive-dev-session=false
       - --var
       - CHAOS_MODE:true
+      - --var
+      - "POCKETBASE_URL:http://pocketbase:8090"
+      - --var
+      - "POCKETBASE_ADMIN_EMAIL:${POCKETBASE_ADMIN_EMAIL:-admin@rem.local}"
+      - --var
+      - "POCKETBASE_ADMIN_PASSWORD:${POCKETBASE_ADMIN_PASSWORD:-rem-local-dev-password}"
+      - --var
+      - "POCKETBASE_IDEMPOTENCY_COLLECTION:idempotency_keys"
+      - --var
+      - "POCKETBASE_AUDIT_COLLECTION:request_audit_logs"
+      - --var
+      - "POCKETBASE_TELEMETRY_COLLECTION:telemetry_metrics"
+      - --var
+      - "STIRLING_PDF_URL:http://stirling-pdf:8080"
     ports:
       - "8787:8787"
     environment:
       WRANGLER_SEND_METRICS: "false"
+      POCKETBASE_URL: "http://pocketbase:8090"
+      POCKETBASE_ADMIN_EMAIL: "${POCKETBASE_ADMIN_EMAIL:-admin@rem.local}"
+      POCKETBASE_ADMIN_PASSWORD: "${POCKETBASE_ADMIN_PASSWORD:-rem-local-dev-password}"
+      POCKETBASE_IDEMPOTENCY_COLLECTION: "idempotency_keys"
+      POCKETBASE_AUDIT_COLLECTION: "request_audit_logs"
+      POCKETBASE_TELEMETRY_COLLECTION: "telemetry_metrics"
+      STIRLING_PDF_URL: "http://stirling-pdf:8080"
+    depends_on:
+      pocketbase:
+        condition: service_started
     healthcheck:
       test:
         - CMD
@@ -72,3 +116,6 @@ services:
       CHAOS_SPIKE_REQUESTS: "${CHAOS_SPIKE_REQUESTS:-60}"
       CHAOS_BURSTS: "${CHAOS_BURSTS:-3}"
     restart: "no"
+
+volumes:
+  pocketbase_data:

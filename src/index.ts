@@ -3,6 +3,10 @@ import {
   InMemoryIdempotencyStore,
   type IdempotencyStore,
 } from "./middleware/idempotency";
+import {
+  PocketBaseStorage,
+  type PocketBaseEnv,
+} from "./adapters/pocketbase";
 import { CircuitBreaker } from "./middleware/circuit-breaker";
 import {
   TelemetryTracer,
@@ -11,8 +15,9 @@ import {
 import { sanitizePayload } from "./middleware/sanitize";
 import { OrderPayloadSchema } from "./validators/payload.schema";
 
-interface Env {
+interface Env extends PocketBaseEnv {
   CHAOS_MODE?: string;
+  STIRLING_PDF_URL?: string;
 }
 
 const JSON_HEADERS = {
@@ -32,7 +37,51 @@ function jsonResponse(
 
 const defaultIdempotencyStore = new InMemoryIdempotencyStore();
 const defaultCircuitBreaker = new CircuitBreaker();
-const defaultTelemetryTracer = new TelemetryTracer();
+let pocketBaseStorage: PocketBaseStorage | null = null;
+
+const defaultTelemetryTracer = new TelemetryTracer({
+  sink: (entry) => {
+    console.log(JSON.stringify(entry));
+    pocketBaseStorage?.recordTelemetry(entry);
+  },
+});
+
+function resolvePocketBaseStorage(env: Env): PocketBaseStorage | null {
+  if (
+    !env.POCKETBASE_URL ||
+    !env.POCKETBASE_ADMIN_EMAIL ||
+    !env.POCKETBASE_ADMIN_PASSWORD
+  ) {
+    pocketBaseStorage = null;
+    return null;
+  }
+
+  const configuredUrl = env.POCKETBASE_URL.replace(/\/$/, "");
+  if (!pocketBaseStorage || pocketBaseStorage.baseUrl !== configuredUrl) {
+    pocketBaseStorage = new PocketBaseStorage({
+      POCKETBASE_URL: env.POCKETBASE_URL,
+      POCKETBASE_ADMIN_EMAIL: env.POCKETBASE_ADMIN_EMAIL,
+      POCKETBASE_ADMIN_PASSWORD: env.POCKETBASE_ADMIN_PASSWORD,
+      ...(env.POCKETBASE_IDEMPOTENCY_COLLECTION
+        ? {
+            POCKETBASE_IDEMPOTENCY_COLLECTION:
+              env.POCKETBASE_IDEMPOTENCY_COLLECTION,
+          }
+        : {}),
+      ...(env.POCKETBASE_AUDIT_COLLECTION
+        ? { POCKETBASE_AUDIT_COLLECTION: env.POCKETBASE_AUDIT_COLLECTION }
+        : {}),
+      ...(env.POCKETBASE_TELEMETRY_COLLECTION
+        ? {
+            POCKETBASE_TELEMETRY_COLLECTION:
+              env.POCKETBASE_TELEMETRY_COLLECTION,
+          }
+        : {}),
+    });
+  }
+
+  return pocketBaseStorage;
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -282,7 +331,7 @@ async function handleRequest(
 }
 
 export function createWorker(
-  idempotencyStore: IdempotencyStore = defaultIdempotencyStore,
+  idempotencyStore?: IdempotencyStore,
   circuitBreaker: CircuitBreaker = defaultCircuitBreaker,
   telemetryTracer: TelemetryTracer = defaultTelemetryTracer,
 ) {
@@ -292,17 +341,27 @@ export function createWorker(
       _env: Env,
       _ctx: ExecutionContext,
     ): Promise<Response> {
+      const pocketBase = resolvePocketBaseStorage(_env);
+      const activeIdempotencyStore =
+        idempotencyStore ?? pocketBase ?? defaultIdempotencyStore;
       const trace = telemetryTracer.startTrace(request);
 
       try {
-        return await handleRequest(
+        const response = await handleRequest(
           request,
-          idempotencyStore,
+          activeIdempotencyStore,
           circuitBreaker,
           trace,
           _env.CHAOS_MODE === "true",
         );
+        if (pocketBase) {
+          _ctx.waitUntil(pocketBase.flush());
+        }
+        return response;
       } catch (error) {
+        if (pocketBase) {
+          _ctx.waitUntil(pocketBase.flush());
+        }
         const response = jsonResponse(
           { error: "Internal server error", code: "INTERNAL_ERROR" },
           500,
