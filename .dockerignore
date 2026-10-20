@@ -1,0 +1,10 @@
+node_modules
+.wrangler
+.git
+coverage
+*.log
+.env
+.dev.vars
+__pycache__
+*.py[cod]
+.venv

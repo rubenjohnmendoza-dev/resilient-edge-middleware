@@ -1,0 +1,11 @@
+node_modules/
+.wrangler/
+dist/
+coverage/
+.dev.vars
+*.log
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+service/scrubbed/

@@ -1,0 +1,29 @@
+{
+  "name": "resilient-edge-middleware",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "description": "Zero-trust order payload validation at the edge.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "dev:docker": "wrangler dev --ip 0.0.0.0 --port 8787 --local",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "chaos": "tsx tests/chaos/chaos-injector.ts"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261019.1",
+    "tsx": "^4.23.15",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "wrangler": "^4.151.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
