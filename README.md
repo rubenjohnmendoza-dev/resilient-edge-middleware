@@ -4,6 +4,18 @@ REM is a Cloudflare Worker for zero-trust order intake. It combines strict Zod
 validation, idempotent request handling, a sliding-window circuit breaker, and
 structured request tracing.
 
+## Verified Results
+
+- Unit tests: **31/31 passing**
+- Worker bundle: **27.75 KiB gzip** from the Wrangler dry-run build
+- Chaos test: **180-request mixed burst with zero unexpected 500 responses**
+- Circuit breaker: 3 injected failures returned `503` with `Retry-After: 10`
+- PocketBase: live integration verified against PocketBase `0.40.5`
+
+See [resilient-edge-middleware.md](resilient-edge-middleware.md) for the full
+evidence table. Docker Compose and Stirling-PDF are structurally verified; full
+runtime execution remains pending a Docker-capable host.
+
 ## Local Docker stack
 
 The stack contains:
