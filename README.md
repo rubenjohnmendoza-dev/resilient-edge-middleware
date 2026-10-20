@@ -1,5 +1,7 @@
 # Resilient Edge Middleware (REM)
 
+[![CI](https://github.com/rubenjohnmendoza-dev/resilient-edge-middleware/actions/workflows/ci.yml/badge.svg)](https://github.com/rubenjohnmendoza-dev/resilient-edge-middleware/actions/workflows/ci.yml)
+
 REM is a Cloudflare Worker for zero-trust order intake. It combines strict Zod
 validation, idempotent request handling, a sliding-window circuit breaker, and
 structured request tracing.
