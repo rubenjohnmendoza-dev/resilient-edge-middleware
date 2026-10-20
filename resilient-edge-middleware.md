@@ -148,6 +148,7 @@ concurrent traffic bursts, and controlled downstream failures. It verifies:
 | Circuit retry header | `Retry-After: 10` |
 | PocketBase live integration | Idempotency 1→2, audit 1→3, telemetry 1→9 |
 | Wrangler dry-run bundle | 27.75 KiB gzip |
+| Docker Compose / Stirling-PDF | Compose definition structurally verified; full runtime execution pending Docker availability |
 
 The PocketBase integration was exercised against PocketBase `0.40.5` with a
 live Wrangler Worker. The media scrubber passed direct image/PDF processing,
@@ -192,6 +193,8 @@ https://github.com/rubenjohnmendoza-dev/resilient-edge-middleware
 - PocketBase write failures fall back to in-memory idempotency for local
   availability; this reduces cross-isolate duplicate guarantees during outages.
 - PocketBase admin credentials in Compose are development defaults only.
-- Docker runtime validation requires a Docker-capable host.
+- Local infrastructure is defined via Docker Compose and structurally verified;
+  full runtime execution, including the Stirling-PDF UI, remains pending local
+  Docker availability.
 - The media scrubber removes embedded metadata and credentials, not statistical
   model watermarks.
