@@ -22,10 +22,9 @@ runtime execution remains pending a Docker-capable host.
 
 ### Idempotency, circuit breaking, and recovery
 
-<video controls muted loop playsinline preload="metadata" poster="./docs/media/rem-chaos-circuit-breaker-poster.jpg" width="100%">
-  <source src="./docs/media/rem-chaos-circuit-breaker.mp4" type="video/mp4">
-  Your browser does not support embedded video. <a href="./docs/media/rem-chaos-circuit-breaker.mp4">Open the demonstration video</a>.
-</video>
+[![Circuit breaker, idempotency, and recovery demonstration](./docs/media/rem-chaos-circuit-breaker.gif)](./docs/media/rem-chaos-circuit-breaker.mp4)
+
+[Open the full-quality MP4](./docs/media/rem-chaos-circuit-breaker.mp4)
 
 This recording shows malformed input rejected with `400`, a valid order returning
 `200`, the exact duplicate rejected with `409`, three injected failures opening
@@ -35,10 +34,9 @@ remaining available, and the cooldown probe closing the breaker after returning
 
 ### Python metadata scrubbing
 
-<video controls muted loop playsinline preload="metadata" poster="./docs/media/rem-metadata-scrubber-poster.jpg" width="100%">
-  <source src="./docs/media/rem-metadata-scrubber.mp4" type="video/mp4">
-  Your browser does not support embedded video. <a href="./docs/media/rem-metadata-scrubber.mp4">Open the metadata-scrubber video</a>.
-</video>
+[![Python metadata scrubber demonstration](./docs/media/rem-metadata-scrubber.gif)](./docs/media/rem-metadata-scrubber.mp4)
+
+[Open the full-quality MP4](./docs/media/rem-metadata-scrubber.mp4)
 
 This recording creates a JPEG with an EXIF artist field, runs the local Python
 scrubber, and verifies that the output is rebuilt with zero EXIF entries.
